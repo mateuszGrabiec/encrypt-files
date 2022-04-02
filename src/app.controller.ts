@@ -2,18 +2,22 @@ import {
   Controller,
   Get,
   Post,
-  Request,
+  Req,
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AppService } from './app.service';
 import { AuthService } from './auth/auth.service';
 import { LocalAuthGuard } from './auth/local-auth.guard';
 import { JwtAuthGuard } from './auth/jwt.guard';
-import { CryptoService, KeyPair } from './crypto/crypto.service';
+import { CryptoService, KeyPair, EncryptedFile } from './crypto/crypto.service';
 import 'multer';
+import { Readable } from 'stream';
+import { Request } from 'express';
 
 @Controller()
 export class AppController {
@@ -30,13 +34,13 @@ export class AppController {
 
   @UseGuards(LocalAuthGuard)
   @Post('auth/login')
-  async login(@Request() req) {
+  async login(@Req() req) {
     return this.authService.login(req.body);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('profile')
-  getProfile(@Request() req) {
+  getProfile(@Req() req) {
     return req.user;
   }
 
@@ -49,7 +53,10 @@ export class AppController {
   @UseGuards(JwtAuthGuard)
   @Post('api/encrypt')
   @UseInterceptors(FileInterceptor('file'))
-  encrypt(@UploadedFile() file: Express.Multer.File, @Request() req): string {
+  encrypt(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req,
+  ): EncryptedFile {
     const { privKey, pubKey } = req.body;
 
     const encryptedFile = this.cryptoService.encryptFile(
@@ -65,8 +72,8 @@ export class AppController {
   @UseInterceptors(FileInterceptor('file'))
   encryptTest(
     @UploadedFile() file: Express.Multer.File,
-    @Request() req,
-  ): string {
+    @Req() req: Request,
+  ): EncryptedFile {
     const { privKey, pubKey } = req.body;
 
     const encryptedFile = this.cryptoService.encryptFile(
@@ -78,8 +85,29 @@ export class AppController {
     return encryptedFile;
   }
 
+  @Post('test/decrypt')
+  @UseInterceptors(FileInterceptor('file'))
+  decryptTest(@Req() req, @Res({ passthrough: true }) res): StreamableFile {
+    const { encryptedKey, privKey, encryptedData, iv } = req.body;
+
+    const decryptedFile = this.cryptoService.decryptFile(
+      encryptedKey,
+      privKey.replace(/(\\r\n|\\n|\r)/gm, '\n'),
+      encryptedData,
+      iv,
+    );
+
+    res.set({
+      'Content-Type': 'application/pdf',
+    });
+
+    const file = Readable.from(Buffer.from(decryptedFile, 'base64'));
+
+    return new StreamableFile(file);
+  }
+
   @Post('register')
-  async register(@Request() req) {
+  async register(@Req() req) {
     const userpost = await this.authService.register(req.body);
     return userpost;
   }

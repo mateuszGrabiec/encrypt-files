@@ -6,6 +6,12 @@ export type KeyPair = {
   pubKey: string;
 };
 
+export type EncryptedFile = {
+  iv: string;
+  encryptedKey: string;
+  encryptedData: string;
+};
+
 @Injectable()
 export class CryptoService {
   generateKeyPair(): KeyPair {
@@ -53,33 +59,49 @@ export class CryptoService {
     );
   }
 
-  encryptFile(file: Buffer, publicKey: string, privateKey: string): any {
+  // todo remove ptiv key
+  encryptFile(
+    file: Buffer,
+    publicKey: string,
+    privateKey: string,
+  ): EncryptedFile {
     const message = file.toString('base64');
 
-    const randomno = 'SwAW1D8kbcXVrq31SwAW1D8kbcXVrq31'; //Randomly generated string of length 16.
+    const randomno = crypto.randomBytes(16).toString('hex');
     const encryptedKey = this.encrypt(randomno, publicKey);
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-ctr', randomno, iv);
     let encryptedData = cipher.update(message, 'utf8', 'base64');
     encryptedData += cipher.final('base64');
 
+    return {
+      iv: iv.toString('base64'),
+      encryptedKey: encryptedKey,
+      encryptedData: encryptedData,
+    };
+  }
+
+  decryptFile(
+    encryptedKey: string,
+    privateKey: string,
+    encryptedData: string,
+    iv: string,
+  ): string {
     const decryptedKey = this.decrypt(encryptedKey, privateKey).toString(
       'base64',
     );
 
-    const decipher = crypto.createDecipheriv('aes-256-ctr', decryptedKey, iv);
+    const decipher = crypto.createDecipheriv(
+      'aes-256-ctr',
+      decryptedKey,
+      Buffer.from(iv, 'base64'),
+    );
     const decryptedBuffers = [
       decipher.update(Buffer.from(encryptedData, 'base64')),
     ];
     decryptedBuffers.push(decipher.final());
     const decrypted = Buffer.concat(decryptedBuffers).toString('utf8');
 
-    console.log('is decrypted OK?', decrypted == message);
-
-    return {
-      iv: iv.toString('base64'),
-      encryptedKey: encryptedKey,
-      encryptedData: encryptedData,
-    };
+    return decrypted;
   }
 }
