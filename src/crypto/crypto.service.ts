@@ -48,6 +48,8 @@ export class CryptoService {
   }
 
   decrypt(encryptedData: string, privateKey: string) {
+    console.log('privateKey', privateKey);
+
     return crypto.privateDecrypt(
       {
         key: privateKey,
@@ -60,11 +62,7 @@ export class CryptoService {
   }
 
   // todo remove ptiv key
-  encryptFile(
-    file: Buffer,
-    publicKey: string,
-    privateKey: string,
-  ): EncryptedFile {
+  encryptFile(file: Buffer, publicKey: string): EncryptedFile {
     const message = file.toString('base64');
 
     const randomno = crypto.randomBytes(16).toString('hex');

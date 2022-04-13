@@ -17,7 +17,6 @@ import { JwtAuthGuard } from './auth/jwt.guard';
 import { CryptoService, KeyPair, EncryptedFile } from './crypto/crypto.service';
 import 'multer';
 import { Readable } from 'stream';
-import { Request } from 'express';
 
 @Controller()
 export class AppController {
@@ -33,8 +32,8 @@ export class AppController {
   }
 
   @UseGuards(LocalAuthGuard)
-  @Post('auth/login')
-  async login(@Req() req) {
+  @Post('api/sign-in')
+  async login(@Req() req): Promise<any> {
     return this.authService.login(req.body);
   }
 
@@ -57,36 +56,18 @@ export class AppController {
     @UploadedFile() file: Express.Multer.File,
     @Req() req,
   ): EncryptedFile {
-    const { privKey, pubKey } = req.body;
+    const { pubKey } = req.body;
 
     const encryptedFile = this.cryptoService.encryptFile(
       file.buffer,
       pubKey.replace(/(\\r\n|\\n|\r)/gm, '\n'),
-      privKey.replace(/(\\r\n|\\n|\r)/gm, '\n'),
-    );
-
-    return encryptedFile;
-  }
-
-  @Post('test/encrypt')
-  @UseInterceptors(FileInterceptor('file'))
-  encryptTest(
-    @UploadedFile() file: Express.Multer.File,
-    @Req() req: Request,
-  ): EncryptedFile {
-    const { privKey, pubKey } = req.body;
-
-    const encryptedFile = this.cryptoService.encryptFile(
-      file.buffer,
-      pubKey.replace(/(\\r\n|\\n|\r)/gm, '\n'),
-      privKey.replace(/(\\r\n|\\n|\r)/gm, '\n'),
     );
 
     return encryptedFile;
   }
 
   @Post('test/decrypt')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseGuards(JwtAuthGuard)
   decryptTest(@Req() req, @Res({ passthrough: true }) res): StreamableFile {
     const { encryptedKey, privKey, encryptedData, iv } = req.body;
 
